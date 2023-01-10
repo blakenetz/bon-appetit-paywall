@@ -1,0 +1,28 @@
+{
+  "name": "bon-appetit-paywall",
+  "version": "1.0.8",
+  "description": "Deletes paywall shhhh",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc index.ts",
+    "lint:android": "web-ext lint",
+    "sign:android": "web-ext sign --api-key=$(grep AMO_JWT_ISSUER .env | cut -d '=' -f2) --api-secret=$(grep AMO_JWT_SECRET .env | cut -d '=' -f2)",
+    "build:android": "web-ext build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/blakenetz/bon-appetit-paywall.git"
+  },
+  "author": "blake<blake.netzeband@gmail.com>",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/blakenetz/bon-appetit-paywall/issues"
+  },
+  "homepage": "https://github.com/blakenetz/bon-appetit-paywall#readme",
+  "dependencies": {
+    "web-ext": "^7.4.0"
+  },
+  "devDependencies": {
+    "typescript": "^4.9.4"
+  }
+}
