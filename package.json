@@ -1,6 +1,6 @@
 {
   "name": "bon-appetit-paywall",
-  "version": "1.0.8",
+  "version": "0.0.1",
   "description": "Deletes paywall shhhh",
   "main": "index.js",
   "scripts": {
