@@ -9,9 +9,9 @@
   "content_scripts": [
     {
       "matches": [
-        "*://www.bonappetit.com/",
-        "*://bonappetit.com/",
-        "*://*/bonappetit.com/"
+        "*://www.bonappetit.com/*",
+        "*://bonappetit.com/*",
+        "*://*/bonappetit.com/*"
       ],
       "js": ["index.js"]
     }

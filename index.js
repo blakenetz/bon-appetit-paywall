@@ -1,32 +1,5 @@
-var __spreadArray = (this && this.__spreadArray) || function (to, from, pack) {
-    if (pack || arguments.length === 2) for (var i = 0, l = from.length, ar; i < l; i++) {
-        if (ar || !(i in from)) {
-            if (!ar) ar = Array.prototype.slice.call(from, 0, i);
-            ar[i] = from[i];
-        }
-    }
-    return to.concat(ar || Array.prototype.slice.call(from));
-};
-var noScrollNodeList = ["html", "body"].map(function (sel) {
-    return document.querySelector(sel);
-});
-var observables = ["#app", "main"].map(function (sel) { return document.querySelector(sel); });
-var classNames = ["noScroll", "no-scroll"];
-var config = {
-    attributes: true,
-    attributeFilter: ["class"]
-};
-function removeByQuery(string) {
-    console.debug("\uD83C\uDF73 removing ".concat(string));
-    Array.from(document.querySelectorAll(string)).forEach(function (el) { return el.remove(); });
-}
-function removeElements() {
-    removeByQuery('[role="dialog"]');
-    removeByQuery('[class*="modal"]');
-    removeByQuery("iframe");
-    removeByQuery("[aria-live]");
-    removeEmptyDiv();
-    overrideFixedPosition();
+function getRecipeEl() {
+    return document.querySelector("[class^='recipe']");
 }
 /**
  * an empty div is typically some sort of overlay
@@ -37,53 +10,81 @@ function removeEmptyDiv() {
         .filter(function (el) { return !el.hasChildNodes(); })
         .forEach(function (el) { return el.remove(); });
 }
-function overrideFixedPosition() {
-    var selectors = [];
-    Array.from(document.styleSheets).forEach(function (styleSheet) {
-        try {
-            return Array.from(styleSheet.cssRules).forEach(function (_a) {
-                var _b;
-                var cssText = _a.cssText;
-                if (/position: fixed/.test(cssText)) {
-                    selectors = selectors.concat((_b = cssText.match(/\..+?\s/g)) !== null && _b !== void 0 ? _b : []);
-                }
-                return false;
-            });
-        }
-        catch (e) { }
-    });
-    console.debug("\uD83C\uDF73 inlining styles for ".concat(selectors.length, " elements"));
-    selectors.forEach(function (sel) {
-        var _a;
-        try {
-            (_a = document.querySelector(sel)) === null || _a === void 0 ? void 0 : _a.setAttribute("style", "position: relative;");
-        }
-        catch (error) { }
-    });
+function removeByQuery(string) {
+    console.debug("\uD83C\uDF73 removing ".concat(string));
+    Array.from(document.querySelectorAll(string)).forEach(function (el) { return el.remove(); });
 }
-function removeNoScrollClass(node) {
-    Array.from(node.classList)
-        .filter(function (cl) { return classNames.some(function (c) { return cl.includes(c); }); })
-        .forEach(function (cl) { return node.classList.remove(cl); });
+var removableQueries = [
+    '[role*="dialog"]',
+    "iframe",
+    '[aria-live="assertive"]',
+];
+function removeElements() {
+    removeEmptyDiv();
+    removableQueries.forEach(removeByQuery);
+}
+function instantiateMutation() {
+    var mutationTarget = document.querySelector("#app-root");
+    var mutationCallback = function (mutations) {
+        // simple flag to indicate we need a refresh
+        var refresh = false;
+        mutations.forEach(function (mutation) {
+            mutation.addedNodes.forEach(function (node) {
+                if (node instanceof Element) {
+                    removableQueries.forEach(function (query) {
+                        if (node.matches(query) || node.querySelectorAll(query).length) {
+                            console.debug("\uD83C\uDF73 removing ".concat(node.childElementCount, " node"));
+                            refresh = true;
+                            try {
+                                node.remove();
+                            }
+                            catch (error) {
+                                refresh = false;
+                                console.debug("\uD83C\uDF73 error removing node: ", error);
+                            }
+                        }
+                    });
+                }
+            });
+        });
+    };
+    var config = { subtree: true, childList: true };
+    var observer = new MutationObserver(mutationCallback);
+    if (mutationTarget) {
+        observer.observe(mutationTarget, config);
+    }
+    return observer;
+}
+function instantiateNetworkIdleHandler(handle, recipeNodes) {
+    var options = { timeout: 3000 };
+    var idleRequestCallback = function (deadline) {
+        if (deadline.didTimeout) {
+            console.debug("\uD83C\uDF73 refreshing DOM");
+            var recipeTarget = getRecipeEl();
+            recipeTarget === null || recipeTarget === void 0 ? void 0 : recipeTarget.replaceChildren.apply(recipeTarget, Array.from(recipeNodes !== null && recipeNodes !== void 0 ? recipeNodes : []));
+        }
+        else {
+            console.debug("\uD83C\uDF73 restart idle request");
+            handle = requestIdleCallback(idleRequestCallback, options);
+        }
+    };
+    handle = requestIdleCallback(idleRequestCallback, options);
 }
 function init() {
+    // closure over recipe nodes
+    var recipeEl = getRecipeEl();
+    // remove troublesome nodes
     window.onload = function () {
         removeElements();
-        classNames
-            .map(function (cl) { return document.querySelectorAll("[class*=\"".concat(cl, "\"]")); })
-            .map(function (nodeList) { return Array.from(nodeList); })
-            .flat()
-            .forEach(function (node) { return removeNoScrollClass(node); });
     };
-    var observer = new MutationObserver(function (mutationsList) {
-        mutationsList.forEach(function (mutation) {
-            return removeNoScrollClass(mutation.target);
-        });
-        removeElements();
-    });
-    __spreadArray(__spreadArray([], noScrollNodeList, true), observables, true).forEach(function (el) {
-        if (el)
-            observer.observe(el, config);
+    var handle = 0;
+    // instantiate observers
+    var observer = instantiateMutation();
+    instantiateNetworkIdleHandler(handle, recipeEl === null || recipeEl === void 0 ? void 0 : recipeEl.children);
+    // clean up
+    addEventListener("beforeunload", function () {
+        observer.disconnect();
+        window.cancelIdleCallback(handle);
     });
 }
 init();
