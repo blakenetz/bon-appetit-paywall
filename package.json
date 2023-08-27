@@ -4,7 +4,7 @@
   "description": "Deletes paywall shhhh",
   "main": "index.js",
   "scripts": {
-    "build": "tsc index.ts",
+    "build": "browserify index.ts -p [ tsify --noImplicitAny ] > index.js",
     "lint:android": "web-ext lint",
     "sign:android": "web-ext sign --api-key=$(grep AMO_JWT_ISSUER .env | cut -d '=' -f2) --api-secret=$(grep AMO_JWT_SECRET .env | cut -d '=' -f2)",
     "build:android": "web-ext build"
@@ -20,9 +20,13 @@
   },
   "homepage": "https://github.com/blakenetz/bon-appetit-paywall#readme",
   "dependencies": {
+    "debounce": "^1.2.1",
     "web-ext": "^7.4.0"
   },
   "devDependencies": {
+    "@types/debounce": "^1.2.1",
+    "browserify": "^17.0.0",
+    "tsify": "^5.0.4",
     "typescript": "^4.9.4"
   }
 }

@@ -1,5 +1,35 @@
-function getRecipeEl() {
-	return document.querySelector("[class^='recipe']");
+type PageEls = {
+	header: Element;
+	body: Element;
+	footer: Element;
+};
+
+function getNode(selector: string, clone = true) {
+	const el = document.querySelector(selector);
+
+	if (el === null) {
+		throw Error(`🍳 Unable to find element: ${selector}`);
+	}
+
+	if (!clone) return el;
+
+	const cloneEl = el.cloneNode(true);
+
+	const returnEl = document.createElement("section");
+	returnEl.append(cloneEl);
+	return returnEl;
+}
+
+function getPageEls(): PageEls {
+	return {
+		header: getNode('[data-testid="RecipePageLedBackground"]'),
+		body: getNode("[class^='recipe']"),
+		footer: getNode('[data-testid="RecipePagContentBackground"]'),
+	};
+}
+
+function getRootEl() {
+	return getNode("#app-root");
 }
 
 /**
@@ -21,30 +51,28 @@ const removableQueries = [
 	'[role*="dialog"]', // includes `alertdialog` as well
 	"iframe",
 	'[aria-live="assertive"]',
+	'[class*="Modal"]',
+	'[class*="modal"]',
+	'[class*="InterstitialWrapper"]',
 ];
 
 function removeElements() {
+	console.debug(`🍳 removing nodes`);
 	removeEmptyDiv();
 	removableQueries.forEach(removeByQuery);
 }
 
-function instantiateMutation() {
-	const mutationTarget = document.querySelector("#app-root");
+function instantiateMutation({ header, body, footer }: PageEls) {
 	const mutationCallback: MutationCallback = (mutations) => {
-		// simple flag to indicate we need a refresh
-		let refresh = false;
-
 		mutations.forEach((mutation) => {
 			mutation.addedNodes.forEach((node) => {
 				if (node instanceof Element) {
 					removableQueries.forEach((query) => {
 						if (node.matches(query) || node.querySelectorAll(query).length) {
 							console.debug(`🍳 removing ${node.childElementCount} node`);
-							refresh = true;
 							try {
 								node.remove();
 							} catch (error) {
-								refresh = false;
 								console.debug(`🍳 error removing node: `, error);
 							}
 						}
@@ -53,32 +81,51 @@ function instantiateMutation() {
 			});
 		});
 	};
-	const config: MutationObserverInit = { subtree: true, childList: true };
 
+	console.debug(`🍳 instantiating observer`);
 	const observer = new MutationObserver(mutationCallback);
+
+	const mutationTarget = getRootEl();
+	const config: MutationObserverInit = { subtree: true, childList: true };
 	if (mutationTarget) {
 		observer.observe(mutationTarget, config);
 	}
+
+	// prepend recipe to start of document
+	console.debug(`🍳 appending nodes to top of document`);
+	console.debug(body, header, footer);
+	const documentBody = getNode("body", false);
+
+	const insertion = document.createElement("section");
+	documentBody.prepend(insertion);
+	insertion.append(header);
+	insertion.append(body);
+	insertion.append(footer);
 
 	return observer;
 }
 
 function init() {
-	// closure over recipe nodes
-	const recipeEl = getRecipeEl();
+	// closure over main elements
+	const kiddos = getPageEls();
 
-	// remove troublesome nodes
 	window.onload = function () {
+		// remove troublesome nodes
 		removeElements();
 	};
 
 	// instantiate observers
-	const observer = instantiateMutation();
+	const observer = instantiateMutation(kiddos);
 
 	// clean up
 	addEventListener("beforeunload", () => {
+		console.debug("🍳 disconnecting");
 		observer.disconnect();
 	});
 }
 
-init();
+try {
+	init();
+} catch (error) {
+	console.debug(`🍳 failed 😢: `, error);
+}

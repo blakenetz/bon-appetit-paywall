@@ -1,46 +1,66 @@
-function getRecipeEl() {
-    return document.querySelector("[class^='recipe']");
+(function(){function r(e,n,t){function o(i,f){if(!n[i]){if(!e[i]){var c="function"==typeof require&&require;if(!f&&c)return c(i,!0);if(u)return u(i,!0);var a=new Error("Cannot find module '"+i+"'");throw a.code="MODULE_NOT_FOUND",a}var p=n[i]={exports:{}};e[i][0].call(p.exports,function(r){var n=e[i][1][r];return o(n||r)},p,p.exports,r,e,n,t)}return n[i].exports}for(var u="function"==typeof require&&require,i=0;i<t.length;i++)o(t[i]);return o}return r})()({1:[function(require,module,exports){
+"use strict";
+function getNode(selector, clone = true) {
+    const el = document.querySelector(selector);
+    if (el === null) {
+        throw Error(`🍳 Unable to find element: ${selector}`);
+    }
+    if (!clone)
+        return el;
+    const cloneEl = el.cloneNode(true);
+    const returnEl = document.createElement("section");
+    returnEl.append(cloneEl);
+    return returnEl;
+}
+function getPageEls() {
+    return {
+        header: getNode('[data-testid="RecipePageLedBackground"]'),
+        body: getNode("[class^='recipe']"),
+        footer: getNode('[data-testid="RecipePagContentBackground"]'),
+    };
+}
+function getRootEl() {
+    return getNode("#app-root");
 }
 /**
  * an empty div is typically some sort of overlay
  */
 function removeEmptyDiv() {
-    console.debug("\uD83C\uDF73 removing empty divs");
+    console.debug(`🍳 removing empty divs`);
     Array.from(document.querySelectorAll("div"))
-        .filter(function (el) { return !el.hasChildNodes(); })
-        .forEach(function (el) { return el.remove(); });
+        .filter((el) => !el.hasChildNodes())
+        .forEach((el) => el.remove());
 }
 function removeByQuery(string) {
-    console.debug("\uD83C\uDF73 removing ".concat(string));
-    Array.from(document.querySelectorAll(string)).forEach(function (el) { return el.remove(); });
+    console.debug(`🍳 removing ${string}`);
+    Array.from(document.querySelectorAll(string)).forEach((el) => el.remove());
 }
-var removableQueries = [
+const removableQueries = [
     '[role*="dialog"]',
     "iframe",
     '[aria-live="assertive"]',
+    '[class*="Modal"]',
+    '[class*="modal"]',
+    '[class*="InterstitialWrapper"]',
 ];
 function removeElements() {
+    console.debug(`🍳 removing nodes`);
     removeEmptyDiv();
     removableQueries.forEach(removeByQuery);
 }
-function instantiateMutation() {
-    var mutationTarget = document.querySelector("#app-root");
-    var mutationCallback = function (mutations) {
-        // simple flag to indicate we need a refresh
-        var refresh = false;
-        mutations.forEach(function (mutation) {
-            mutation.addedNodes.forEach(function (node) {
+function instantiateMutation({ header, body, footer }) {
+    const mutationCallback = (mutations) => {
+        mutations.forEach((mutation) => {
+            mutation.addedNodes.forEach((node) => {
                 if (node instanceof Element) {
-                    removableQueries.forEach(function (query) {
+                    removableQueries.forEach((query) => {
                         if (node.matches(query) || node.querySelectorAll(query).length) {
-                            console.debug("\uD83C\uDF73 removing ".concat(node.childElementCount, " node"));
-                            refresh = true;
+                            console.debug(`🍳 removing ${node.childElementCount} node`);
                             try {
                                 node.remove();
                             }
                             catch (error) {
-                                refresh = false;
-                                console.debug("\uD83C\uDF73 error removing node: ", error);
+                                console.debug(`🍳 error removing node: `, error);
                             }
                         }
                     });
@@ -48,43 +68,45 @@ function instantiateMutation() {
             });
         });
     };
-    var config = { subtree: true, childList: true };
-    var observer = new MutationObserver(mutationCallback);
+    console.debug(`🍳 instantiating observer`);
+    const observer = new MutationObserver(mutationCallback);
+    const mutationTarget = getRootEl();
+    const config = { subtree: true, childList: true };
     if (mutationTarget) {
         observer.observe(mutationTarget, config);
     }
+    // prepend recipe to start of document
+    console.debug(`🍳 appending nodes to top of document`);
+    console.debug(body, header, footer);
+    const documentBody = getNode("body", false);
+    const insertion = document.createElement("section");
+    documentBody.prepend(insertion);
+    insertion.append(header);
+    insertion.append(body);
+    insertion.append(footer);
     return observer;
 }
-function instantiateNetworkIdleHandler(handle, recipeNodes) {
-    var options = { timeout: 3000 };
-    var idleRequestCallback = function (deadline) {
-        if (deadline.didTimeout) {
-            console.debug("\uD83C\uDF73 refreshing DOM");
-            var recipeTarget = getRecipeEl();
-            recipeTarget === null || recipeTarget === void 0 ? void 0 : recipeTarget.replaceChildren.apply(recipeTarget, Array.from(recipeNodes !== null && recipeNodes !== void 0 ? recipeNodes : []));
-        }
-        else {
-            console.debug("\uD83C\uDF73 restart idle request");
-            handle = requestIdleCallback(idleRequestCallback, options);
-        }
-    };
-    handle = requestIdleCallback(idleRequestCallback, options);
-}
 function init() {
-    // closure over recipe nodes
-    var recipeEl = getRecipeEl();
-    // remove troublesome nodes
+    // closure over main elements
+    const kiddos = getPageEls();
+    console.log(kiddos);
     window.onload = function () {
+        // remove troublesome nodes
         removeElements();
     };
-    var handle = 0;
     // instantiate observers
-    var observer = instantiateMutation();
-    instantiateNetworkIdleHandler(handle, recipeEl === null || recipeEl === void 0 ? void 0 : recipeEl.children);
+    const observer = instantiateMutation(kiddos);
     // clean up
-    addEventListener("beforeunload", function () {
+    addEventListener("beforeunload", () => {
+        console.log("disconnect");
         observer.disconnect();
-        window.cancelIdleCallback(handle);
     });
 }
-init();
+try {
+    init();
+}
+catch (error) {
+    console.debug(`🍳 failed 😢: `, error);
+}
+
+},{}]},{},[1]);
