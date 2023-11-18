@@ -97,38 +97,81 @@ function instantiateMutation() {
 }
 
 /** @see https://stackoverflow.com/a/67243723 */
-const kebabize = (str: string) =>
-	str.replace(
+function kebabize(str: string) {
+	return str.replace(
 		/[A-Z]+(?![a-z])|[A-Z]/g,
 		($, ofs) => (ofs ? "-" : "") + $.toLowerCase()
 	);
+}
 
-function appendRecipe({ header, body, footer }: PageEls) {
-	// prepend recipe to start of document
-	const documentBody = getNode("body", false);
-
-	const insertion = document.createElement("section");
-
-	const css: Partial<CSSStyleDeclaration> = {
-		padding: "8px",
-		position: "absolute",
-		top: "0",
-		border: "8px solid salmon",
-		background: "white",
-		zIndex: "1000",
-	};
-
-	const cssText = Object.keys(css)
+function generateCssText(css: Partial<CSSStyleDeclaration>) {
+	return Object.keys(css)
 		.map((key) => `${kebabize(key)}:${css[key as keyof typeof css]}`)
 		.join(";");
+}
 
-	insertion.style.cssText = cssText;
+function appendRecipe() {
+	// fetch target elements
+	const documentBody = getNode("body", false);
+	const { header, body, footer } = getPageEls();
 
-	const heading = document.createElement("h1");
-	heading.textContent = "Recipe:";
+	// create insertion node
+	const insertion = document.createElement("section");
+	insertion.style.cssText = generateCssText({
+		padding: "1em",
+		position: "absolute",
+		top: "0",
+		border: "1em solid salmon",
+		background: "white",
+		zIndex: "1000",
+	});
 
+	// create header elements
+	const heading = document.createElement("div");
+	heading.style.cssText = generateCssText({
+		display: "flex",
+		justifyContent: "space-between",
+	});
+
+	// h1 element
+	const h1 = document.createElement("h1");
+	h1.textContent = "Recipe:";
+	h1.style.cssText = generateCssText({ margin: "0" });
+	heading.append(h1);
+
+	// toggle button
+	const button = document.createElement("button");
+	button.textContent = "-";
+	button.classList.add("toggle-button");
+	button.style.cssText = generateCssText({
+		background: "salmon",
+		height: "2em",
+		width: "2em",
+		borderRadius: "90px",
+	});
+	var css = ".toggle-button:hover{ background-color: rgb(250 128 114 / 70%) }";
+	var style = document.createElement("style");
+	style.appendChild(document.createTextNode(css));
+	document.getElementsByTagName("head")[0].appendChild(style);
+
+	let collapse = false;
+	function handleCollapse() {
+		if (collapse) {
+			collapse = !collapse;
+		} else {
+			collapse = false;
+		}
+	}
+
+	button.addEventListener("click", handleCollapse);
+	addEventListener("beforeunload", () => {
+		button.removeEventListener("click", handleCollapse);
+	});
+
+	heading.append(button);
+
+	// DOM mutations
 	documentBody.prepend(insertion);
-
 	insertion.append(heading);
 	insertion.append(header);
 	insertion.append(body);
@@ -136,8 +179,6 @@ function appendRecipe({ header, body, footer }: PageEls) {
 }
 
 function init() {
-	// closure over main elements
-	const kiddos = getPageEls();
 	// instantiate observers
 	const observer = instantiateMutation();
 
@@ -145,7 +186,7 @@ function init() {
 		// remove troublesome nodes
 		removeElements();
 		// append recipe to top of doom
-		appendRecipe(kiddos);
+		appendRecipe();
 	};
 
 	// clean up

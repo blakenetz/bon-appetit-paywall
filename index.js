@@ -80,12 +80,21 @@ function instantiateMutation() {
     return observer;
 }
 /** @see https://stackoverflow.com/a/67243723 */
-const kebabize = (str) => str.replace(/[A-Z]+(?![a-z])|[A-Z]/g, ($, ofs) => (ofs ? "-" : "") + $.toLowerCase());
-function appendRecipe({ header, body, footer }) {
-    // prepend recipe to start of document
+function kebabize(str) {
+    return str.replace(/[A-Z]+(?![a-z])|[A-Z]/g, ($, ofs) => (ofs ? "-" : "") + $.toLowerCase());
+}
+function generateCssText(css) {
+    return Object.keys(css)
+        .map((key) => `${kebabize(key)}:${css[key]}`)
+        .join(";");
+}
+function appendRecipe() {
+    // fetch target elements
     const documentBody = getNode("body", false);
+    const { header, body, footer } = getPageEls();
+    // create insertion node
     const insertion = document.createElement("section");
-    const css = {
+    const insertionCss = {
         padding: "8px",
         position: "absolute",
         top: "0",
@@ -93,12 +102,33 @@ function appendRecipe({ header, body, footer }) {
         background: "white",
         zIndex: "1000",
     };
-    const cssText = Object.keys(css)
-        .map((key) => `${kebabize(key)}:${css[key]}`)
-        .join(";");
-    insertion.style.cssText = cssText;
-    const heading = document.createElement("h1");
-    heading.textContent = "Recipe:";
+    insertion.style.cssText = generateCssText(insertionCss);
+    // create header elements
+    const heading = document.createElement("div");
+    const headingCss = {
+        display: "flex",
+    };
+    heading.style.cssText = generateCssText(headingCss);
+    const h1 = document.createElement("h1");
+    h1.textContent = "Recipe:";
+    heading.append(h1);
+    const collapseToggle = document.createElement("button");
+    collapseToggle.textContent = "-";
+    let collapse = false;
+    function handleCollapse() {
+        if (collapse) {
+            collapse = !collapse;
+        }
+        else {
+            collapse = false;
+        }
+    }
+    collapseToggle.addEventListener("click", handleCollapse);
+    addEventListener("beforeunload", () => {
+        collapseToggle.removeEventListener("click", handleCollapse);
+    });
+    heading.append(collapseToggle);
+    // DOM mutations
     documentBody.prepend(insertion);
     insertion.append(heading);
     insertion.append(header);
@@ -106,15 +136,13 @@ function appendRecipe({ header, body, footer }) {
     insertion.append(footer);
 }
 function init() {
-    // closure over main elements
-    const kiddos = getPageEls();
     // instantiate observers
     const observer = instantiateMutation();
     window.onload = function () {
         // remove troublesome nodes
         removeElements();
         // append recipe to top of doom
-        appendRecipe(kiddos);
+        appendRecipe();
     };
     // clean up
     addEventListener("beforeunload", () => {
