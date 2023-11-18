@@ -54,6 +54,8 @@ const removableQueries = [
 	'[class*="Modal"]',
 	'[class*="modal"]',
 	'[class*="InterstitialWrapper"]',
+	'[class*="Paywall"]',
+	'[class*="PersistentBottom"]',
 ];
 
 function removeElements() {
@@ -62,7 +64,7 @@ function removeElements() {
 	removableQueries.forEach(removeByQuery);
 }
 
-function instantiateMutation({ header, body, footer }: PageEls) {
+function instantiateMutation() {
 	const mutationCallback: MutationCallback = (mutations) => {
 		mutations.forEach((mutation) => {
 			mutation.addedNodes.forEach((node) => {
@@ -82,40 +84,69 @@ function instantiateMutation({ header, body, footer }: PageEls) {
 		});
 	};
 
-	console.debug(`🍳 instantiating observer`);
 	const observer = new MutationObserver(mutationCallback);
 
 	const mutationTarget = getRootEl();
 	const config: MutationObserverInit = { subtree: true, childList: true };
 	if (mutationTarget) {
+		console.debug(`🍳 instantiating observer`);
 		observer.observe(mutationTarget, config);
 	}
 
+	return observer;
+}
+
+/** @see https://stackoverflow.com/a/67243723 */
+const kebabize = (str: string) =>
+	str.replace(
+		/[A-Z]+(?![a-z])|[A-Z]/g,
+		($, ofs) => (ofs ? "-" : "") + $.toLowerCase()
+	);
+
+function appendRecipe({ header, body, footer }: PageEls) {
 	// prepend recipe to start of document
-	console.debug(`🍳 appending nodes to top of document`);
-	console.debug(body, header, footer);
 	const documentBody = getNode("body", false);
 
 	const insertion = document.createElement("section");
+
+	const css: Partial<CSSStyleDeclaration> = {
+		padding: "8px",
+		position: "absolute",
+		top: "0",
+		border: "8px solid salmon",
+		background: "white",
+		zIndex: "1000",
+	};
+
+	const cssText = Object.keys(css)
+		.map((key) => `${kebabize(key)}:${css[key as keyof typeof css]}`)
+		.join(";");
+
+	insertion.style.cssText = cssText;
+
+	const heading = document.createElement("h1");
+	heading.textContent = "Recipe:";
+
 	documentBody.prepend(insertion);
+
+	insertion.append(heading);
 	insertion.append(header);
 	insertion.append(body);
 	insertion.append(footer);
-
-	return observer;
 }
 
 function init() {
 	// closure over main elements
 	const kiddos = getPageEls();
+	// instantiate observers
+	const observer = instantiateMutation();
 
 	window.onload = function () {
 		// remove troublesome nodes
 		removeElements();
+		// append recipe to top of doom
+		appendRecipe(kiddos);
 	};
-
-	// instantiate observers
-	const observer = instantiateMutation(kiddos);
 
 	// clean up
 	addEventListener("beforeunload", () => {
