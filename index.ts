@@ -1,30 +1,34 @@
 type PageEls = {
-	header: Element;
-	body: Element;
-	footer: Element;
+	header: HTMLElement;
+	body: HTMLElement;
+	footer: HTMLElement;
 };
 
-function getNode(selector: string, clone = true) {
-	const el = document.querySelector(selector);
+function getNode<E extends Element>(selector: string): E {
+	const el = document.querySelector<E>(selector);
 
 	if (el === null) {
 		throw Error(`🍳 Unable to find element: ${selector}`);
 	}
 
-	if (!clone) return el;
+	return el;
+}
 
+function cloneNode(selector: string) {
+	const el = getNode(selector);
 	const cloneEl = el.cloneNode(true);
 
 	const returnEl = document.createElement("section");
 	returnEl.append(cloneEl);
+
 	return returnEl;
 }
 
 function getPageEls(): PageEls {
 	return {
-		header: getNode('[data-testid="RecipePageLedBackground"]'),
-		body: getNode("[class^='recipe']"),
-		footer: getNode('[data-testid="RecipePagContentBackground"]'),
+		header: cloneNode('[data-testid="RecipePageLedBackground"]'),
+		body: cloneNode("[class^='recipe']"),
+		footer: cloneNode('[data-testid="RecipePagContentBackground"]'),
 	};
 }
 
@@ -110,65 +114,118 @@ function generateCssText(css: Partial<CSSStyleDeclaration>) {
 		.join(";");
 }
 
-function appendRecipe() {
-	// fetch target elements
-	const documentBody = getNode("body", false);
-	const { header, body, footer } = getPageEls();
+function createEl(
+	tag: keyof HTMLElementTagNameMap,
+	css: Partial<CSSStyleDeclaration>,
+	content: string = "",
+	attr: Record<string, string> = {}
+): HTMLElement {
+	const el = document.createElement(tag);
+	el.style.cssText = generateCssText(css);
 
-	// create insertion node
-	const insertion = document.createElement("section");
-	insertion.style.cssText = generateCssText({
-		padding: "1em",
-		position: "absolute",
-		top: "0",
-		border: "1em solid salmon",
-		background: "white",
-		zIndex: "1000",
-	});
-
-	// create header elements
-	const heading = document.createElement("div");
-	heading.style.cssText = generateCssText({
-		display: "flex",
-		justifyContent: "space-between",
-	});
-
-	// h1 element
-	const h1 = document.createElement("h1");
-	h1.textContent = "Recipe:";
-	h1.style.cssText = generateCssText({ margin: "0" });
-	heading.append(h1);
-
-	// toggle button
-	const button = document.createElement("button");
-	button.textContent = "-";
-	button.classList.add("toggle-button");
-	button.style.cssText = generateCssText({
-		background: "salmon",
-		height: "2em",
-		width: "2em",
-		borderRadius: "90px",
-	});
-	var css = ".toggle-button:hover{ background-color: rgb(250 128 114 / 70%) }";
-	var style = document.createElement("style");
-	style.appendChild(document.createTextNode(css));
-	document.getElementsByTagName("head")[0].appendChild(style);
-
-	let collapse = false;
-	function handleCollapse() {
-		if (collapse) {
-			collapse = !collapse;
-		} else {
-			collapse = false;
-		}
+	if (content) {
+		el.textContent = content;
 	}
 
-	button.addEventListener("click", handleCollapse);
-	addEventListener("beforeunload", () => {
-		button.removeEventListener("click", handleCollapse);
+	if (attr) {
+		Object.keys(attr).forEach((name) =>
+			el.setAttribute(name, attr[name as keyof typeof attr])
+		);
+	}
+
+	return el;
+}
+
+function appendRecipe() {
+	// fetch target elements
+	const documentBody = getNode("body");
+	const { header, body, footer } = getPageEls();
+
+	const insertion = createEl(
+		"section",
+		{
+			padding: "1em",
+			position: "absolute",
+			top: "0",
+			border: "1em solid salmon",
+			background: "white",
+			zIndex: "1000",
+		},
+		undefined,
+		{ id: "insert" }
+	);
+
+	const heading = createEl("div", {
+		display: "flex",
+		justifyContent: "space-between",
+		marginBottom: "1em",
 	});
 
-	heading.append(button);
+	const h1 = createEl("h1", { margin: "0" }, "Recipe:");
+	heading.append(h1);
+
+	const collapseBtn = createEl("button", { display: "block" }, "-", {
+		class: "toggle-button",
+		id: "collapse",
+	});
+	heading.append(collapseBtn);
+
+	const expandBtn = createEl(
+		"button",
+		{
+			position: "fixed",
+			bottom: "1em",
+			right: "1.5em",
+			display: "none",
+		},
+		"+",
+		{ class: "toggle-button", id: "expand" }
+	);
+
+	// button styles
+	const style = document.createElement("style");
+	const buttonCss: {
+		base: Partial<CSSStyleDeclaration>;
+		hover: Partial<CSSStyleDeclaration>;
+	} = {
+		base: {
+			height: "2em",
+			width: "2em",
+			borderRadius: "90px",
+			background: "salmon",
+		},
+		hover: {
+			backgroundColor: "rgb(250 128 114 / 70%)",
+			textDecoration: "none",
+		},
+	};
+	const buttonCssText = `.toggle-button{ ${generateCssText(buttonCss.base)} }
+	.toggle-button:hover, .toggle-button:focus{ ${generateCssText(
+		buttonCss.hover
+	)} }`;
+	style.appendChild(document.createTextNode(buttonCssText));
+	document.getElementsByTagName("head")[0].appendChild(style);
+
+	// button logic
+	function handleClick(e: MouseEvent) {
+		const target = e.target as HTMLButtonElement;
+		const expandBtn = getNode<HTMLButtonElement>("#expand");
+		const main = getNode<HTMLElement>("#insert");
+
+		if (target.id === "collapse") {
+			expandBtn.style.display = "block";
+			main.style.display = "none";
+		} else {
+			expandBtn.style.display = "none";
+			main.style.display = "block";
+		}
+	}
+	collapseBtn.addEventListener("click", handleClick);
+	expandBtn.addEventListener("click", handleClick);
+	addEventListener("beforeunload", () => {
+		collapseBtn.removeEventListener("click", handleClick);
+		expandBtn.removeEventListener("click", handleClick);
+	});
 
 	// DOM mutations
 	documentBody.prepend(insertion);
@@ -176,6 +233,7 @@ function appendRecipe() {
 	insertion.append(header);
 	insertion.append(body);
 	insertion.append(footer);
+	documentBody.append(expandBtn);
 }
 
 function init() {

@@ -1,12 +1,14 @@
 (function(){function r(e,n,t){function o(i,f){if(!n[i]){if(!e[i]){var c="function"==typeof require&&require;if(!f&&c)return c(i,!0);if(u)return u(i,!0);var a=new Error("Cannot find module '"+i+"'");throw a.code="MODULE_NOT_FOUND",a}var p=n[i]={exports:{}};e[i][0].call(p.exports,function(r){var n=e[i][1][r];return o(n||r)},p,p.exports,r,e,n,t)}return n[i].exports}for(var u="function"==typeof require&&require,i=0;i<t.length;i++)o(t[i]);return o}return r})()({1:[function(require,module,exports){
 "use strict";
-function getNode(selector, clone = true) {
+function getNode(selector) {
     const el = document.querySelector(selector);
     if (el === null) {
         throw Error(`🍳 Unable to find element: ${selector}`);
     }
-    if (!clone)
-        return el;
+    return el;
+}
+function cloneNode(selector) {
+    const el = getNode(selector);
     const cloneEl = el.cloneNode(true);
     const returnEl = document.createElement("section");
     returnEl.append(cloneEl);
@@ -14,9 +16,9 @@ function getNode(selector, clone = true) {
 }
 function getPageEls() {
     return {
-        header: getNode('[data-testid="RecipePageLedBackground"]'),
-        body: getNode("[class^='recipe']"),
-        footer: getNode('[data-testid="RecipePagContentBackground"]'),
+        header: cloneNode('[data-testid="RecipePageLedBackground"]'),
+        body: cloneNode("[class^='recipe']"),
+        footer: cloneNode('[data-testid="RecipePagContentBackground"]'),
     };
 }
 function getRootEl() {
@@ -88,52 +90,92 @@ function generateCssText(css) {
         .map((key) => `${kebabize(key)}:${css[key]}`)
         .join(";");
 }
+function createEl(tag, css, content = "", attr = {}) {
+    const el = document.createElement(tag);
+    el.style.cssText = generateCssText(css);
+    if (content) {
+        el.textContent = content;
+    }
+    if (attr) {
+        Object.keys(attr).forEach((name) => el.setAttribute(name, attr[name]));
+    }
+    return el;
+}
 function appendRecipe() {
     // fetch target elements
-    const documentBody = getNode("body", false);
+    const documentBody = getNode("body");
     const { header, body, footer } = getPageEls();
-    // create insertion node
-    const insertion = document.createElement("section");
-    const insertionCss = {
-        padding: "8px",
+    const insertion = createEl("section", {
+        padding: "1em",
         position: "absolute",
         top: "0",
-        border: "8px solid salmon",
+        border: "1em solid salmon",
         background: "white",
         zIndex: "1000",
-    };
-    insertion.style.cssText = generateCssText(insertionCss);
-    // create header elements
-    const heading = document.createElement("div");
-    const headingCss = {
+    }, undefined, { id: "insert" });
+    const heading = createEl("div", {
         display: "flex",
-    };
-    heading.style.cssText = generateCssText(headingCss);
-    const h1 = document.createElement("h1");
-    h1.textContent = "Recipe:";
+        justifyContent: "space-between",
+        marginBottom: "1em",
+    });
+    const h1 = createEl("h1", { margin: "0" }, "Recipe:");
     heading.append(h1);
-    const collapseToggle = document.createElement("button");
-    collapseToggle.textContent = "-";
-    let collapse = false;
-    function handleCollapse() {
-        if (collapse) {
-            collapse = !collapse;
+    const collapseBtn = createEl("button", { display: "block" }, "-", {
+        class: "toggle-button",
+        id: "collapse",
+    });
+    heading.append(collapseBtn);
+    const expandBtn = createEl("button", {
+        position: "fixed",
+        bottom: "1em",
+        right: "1.5em",
+        display: "none",
+    }, "+", { class: "toggle-button", id: "expand" });
+    // button styles
+    const style = document.createElement("style");
+    const buttonCss = {
+        base: {
+            height: "2em",
+            width: "2em",
+            borderRadius: "90px",
+            background: "salmon",
+        },
+        hover: {
+            backgroundColor: "rgb(250 128 114 / 70%)",
+            textDecoration: "none",
+        },
+    };
+    const buttonCssText = `.toggle-button{ ${generateCssText(buttonCss.base)} }
+	.toggle-button:hover, .toggle-button:focus{ ${generateCssText(buttonCss.hover)} }`;
+    style.appendChild(document.createTextNode(buttonCssText));
+    document.getElementsByTagName("head")[0].appendChild(style);
+    // button logic
+    function handleClick(e) {
+        const target = e.target;
+        const expandBtn = getNode("#expand");
+        const main = getNode("#insert");
+        if (target.id === "collapse") {
+            expandBtn.style.display = "block";
+            main.style.display = "none";
         }
         else {
-            collapse = false;
+            expandBtn.style.display = "none";
+            main.style.display = "block";
         }
     }
-    collapseToggle.addEventListener("click", handleCollapse);
+    collapseBtn.addEventListener("click", handleClick);
+    expandBtn.addEventListener("click", handleClick);
     addEventListener("beforeunload", () => {
-        collapseToggle.removeEventListener("click", handleCollapse);
+        collapseBtn.removeEventListener("click", handleClick);
+        expandBtn.removeEventListener("click", handleClick);
     });
-    heading.append(collapseToggle);
     // DOM mutations
     documentBody.prepend(insertion);
     insertion.append(heading);
     insertion.append(header);
     insertion.append(body);
     insertion.append(footer);
+    documentBody.append(expandBtn);
 }
 function init() {
     // instantiate observers
